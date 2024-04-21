@@ -40,7 +40,7 @@ dt = -0.001j  # Imaginary time step
 
 a_s = 100*a0 # Scattering length
 
-om = 2*np.pi*100/w0  #Axial trap frequency
+om = 2*np.pi*0/w0  #Axial trap frequency
 om_rho = 2*np.pi*500/w0 # Radial trap frequency
 
 #Corresponding length scales from H.O. frequencies
@@ -57,7 +57,7 @@ num_eigenvalues = 1024  # Number of eigenvalues to compute
 
 # Initial wave function parameters
 x0 = 0.0  # Initial position of the wave packet
-sigma = 100.0  # Width of the wave packet
+sigma = 20.0  # Width of the wave packet
 
 #Set up for simulation
 E_old = 1
