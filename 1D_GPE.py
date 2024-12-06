@@ -33,36 +33,36 @@ l = 1e-6 #Length unit
 w0 = hbar/(m*l**2) #Frequency unit (energy is hbar*w0)
 
 # Parameters
-L = 100.0  # Length of the space domain
-N = 2048  # Number of spatial grid points
+L = 200.0  # Length of the space domain
+N = 4096  # Number of spatial grid points
 dx = L / N  # Spatial grid spacing
-dt = -0.001j  # Imaginary time step
+dt = -0.00001j  # Imaginary time step
 
 a_s = 100*a0 # Scattering length
 
-om = 2*np.pi*0/w0  #Axial trap frequency
+om = 2*np.pi*30/w0  #Axial trap frequency
 om_rho = 2*np.pi*500/w0 # Radial trap frequency
 
 #Corresponding length scales from H.O. frequencies
 l_rho = np.sqrt(hbar/(m*om_rho))
 l_x = np.sqrt(hbar/(m*om))
 
-Norm = 30000 # Atom number
+Norm = 1000000 # Atom number
 
 g = 2*a_s*Norm/l_rho # Dimensionless q1D interaction
 
-tol = 1e-15 #Imainary time tolerance
+tol = 1e-18 #Imainary time tolerance
 
-num_eigenvalues = 1024  # Number of eigenvalues to compute
+num_eigenvalues = N-2  # Number of eigenvalues to compute
 
 # Initial wave function parameters
 x0 = 0.0  # Initial position of the wave packet
-sigma = 20.0  # Width of the wave packet
+sigma = 0.9*(Norm*g/om)**0.2  # Width of the wave packet
 
 #Set up for simulation
 E_old = 1
 E_err = 1
-mu = 0 # Chemical potential
+mu = 0.6 # Chemical potential
 index = 0
 
 # Initialize spatial grid
@@ -72,10 +72,15 @@ x = np.linspace(-L/2, L/2, N, endpoint=False)
 if om==0:
     psi = np.ones(N) #Homogeneous initial condition
 else:
-    psi = np.exp(-(x - x0)**2 / (2 * sigma**2))
+    psi = np.convolve(np.real(np.lib.scimath.sqrt(1-(x-x0)**2/sigma**2)),np.exp(-(x-x0)**2/(2*2**2)),'same')
         
+#Include the next two lines if you want to add a black soliton
+#psi[x>=0] = -psi[x>=0]
+#psi[x==0] = 0
+
 psi *= 1/np.sqrt(np.trapz(np.abs(psi)**2, x)) #Renormalize to 1
-    
+
+   
 # Initialize potential
 V = 1/2 * om**2 * x**2
 
@@ -89,18 +94,20 @@ np.disp('Finding stationary solution....')
 # Imaginary time evolution
 while E_err > tol:
     # Split-step Fourier method
-    # Step 1: Apply half of the kinetic energy operator
-    psi_k = fft(psi)
-    psi_k *= np.exp(-0.25j * (k**2) * dt)
-    psi = ifft(psi_k)
+    # Step 1: Apply half of the potential energy operator
+    psi *= np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt)
     
     # Step 2: Apply potential energy operator
-    psi *= np.exp(-1j * (V + g*np.abs(psi)**2 - mu)  * dt)
-    
-    # Step 3: Apply another half of the kinetic energy operator
     psi_k = fft(psi)
-    psi_k *= np.exp(-0.25j * (k**2) * dt)
+    psi_k *= np.exp(-0.5j * (k**2) * dt)
     psi = ifft(psi_k)
+    
+    # Step 3: Apply half of the kinetic energy operator
+    psi *= np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt)
+    
+    #Include the next two lines if you want to add a black soliton
+    #psi[x>=0] = -abs(psi[x>=0])
+    #psi[x==0] = 0
         
     # Normalize wave function
     psi *= 1/np.sqrt(np.trapz(np.abs(psi)**2, x))
@@ -117,7 +124,7 @@ while E_err > tol:
     index +=1
     
     # Plot results
-    if index % 2000 == 0: #plot every 2000 steps
+    if index % 10000 == 0: #plot every 2000 steps
         plt.plot(x, np.abs(psi)**2)
         plt.xlabel('x')
         plt.ylabel('|Psi|^2')
@@ -148,7 +155,7 @@ Equation references below refer to this thesis
 """
 # Define a function representing the kinetic part for an arbitrary function
 def kin(f):
-    H_kin = -0.5*np.real(ifft(-k**2*fft(f)))
+    H_kin = -0.5*(ifft(-k**2*fft(f)))
     return H_kin
 
 #Exhcange operator
@@ -181,10 +188,10 @@ eigenvalues = eigenvalues[idx]
 eigenvectors = eigenvectors[:, idx]
 
 # This returns e^2, so we need to take the square root
-eigenvalues = np.lib.scimath.sqrt(eigenvalues)
+eigenvalues = np.real(np.lib.scimath.sqrt(eigenvalues))
 
 #Remove the Goldstone mode
-if np.abs(eigenvalues[0])==0:
+if np.abs(eigenvalues[0])<1e-6:
     eigenvectors = eigenvectors[:,range(1,num_eigenvalues)]
     eigenvalues = eigenvalues[range(1,num_eigenvalues)]
     num_eigenvalues += -1
@@ -209,7 +216,7 @@ for ii in range(num_eigenvalues):
 dpsi = u-np.conj(v)
 
 # Print the eigenvalues
-print("Eigenvalues:", eigenvalues[range(10)])
+print("Eigenvalues:", eigenvalues[range(10)]/om)
 
 # Plot some of the eigenfunctions
 for i in range(min(num_eigenvalues, 5)):
@@ -231,7 +238,7 @@ Equation references below refer to this paper
 omega = np.linspace(0, 20, 1024, endpoint=False)
 
 #Energy braodening
-sig = 0.05
+sig = 0.005
 
 #Construct 2D matrices
 [K,OM] = np.meshgrid(k,omega)
@@ -239,7 +246,7 @@ sig = 0.05
 #Calculate Structure factor [Eq. (S3)]
 np.disp('Calculating the structure factor....')
 S = np.zeros(OM.shape)
-for ii in range(num_eigenvalues):
+for ii in range(sum(eigenvalues<max(omega))):
     S = S + np.matlib.repmat(np.abs(np.fft.ifftshift(fft(np.fft.fftshift(np.conj(u[:,ii] + v[:,ii])*psi)))*dx)**2,len(omega),1)*np.exp(-(OM-np.real(eigenvalues[ii]))**2/(2*sig**2))/np.sqrt(2*np.pi*sig**2)
 
 np.disp('.... done!')
@@ -249,30 +256,14 @@ plt.pcolormesh(k_norm,omega,S,vmin=0,vmax=0.5)
 plt.xlabel('k')
 plt.ylabel('Energy')
 plt.title('Dynamic structure factor')
-plt.xlim(-10, 10)
-plt.ylim(0, max(omega))
+plt.xlim(-5, 5)
+plt.ylim(0, 5)
 
 
 #If there is no harmonic trap, this has an analytic form
 if om==0:
     plt.plot(k_norm,np.sqrt(k_norm**2/2*(k_norm**2/2+2*g*max(np.abs(psi)**2))))
     
-plt.show()
-
-# For trapped systems, k is not a good quantum number, so here we estimate each eigenvalue's corresponding k value
-avg_k = np.zeros((num_eigenvalues))
-for ii in range(num_eigenvalues):
-    uk = np.fft.fftshift(fft(u[:,ii]))
-    vk = np.fft.fftshift(fft(v[:,ii]))
-    func_k = np.abs(uk)**2 + np.abs(vk)**2
-    avg_k[ii] = np.sqrt(np.trapz(k_norm**2*func_k)/np.trapz(func_k))
-
-plt.plot(avg_k,np.real(eigenvalues))
-plt.xlabel('k')
-plt.ylabel('Energy')
-plt.xlim(0, 10)
-plt.ylim(0, max(omega))
-plt.title('Average k vs e')
 plt.show()
 
 #Calculate the static structure factor and
@@ -296,6 +287,7 @@ plt.xlabel('k')
 plt.legend()
 plt.title('f-sum rule')
 plt.show()
+
 
 #plot the static structure factor, should tend to 1 in large k limit
 plt.figure()
