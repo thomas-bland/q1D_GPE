@@ -95,7 +95,7 @@ np.disp('Finding stationary solution....')
 while E_err > tol:
     # Split-step Fourier method
     # Step 1: Apply half of the potential energy operator
-    psi *= np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt)
+    psi *= np.real(np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt))
     
     # Step 2: Apply potential energy operator
     psi_k = fft(psi)
@@ -103,7 +103,7 @@ while E_err > tol:
     psi = ifft(psi_k)
     
     # Step 3: Apply half of the kinetic energy operator
-    psi *= np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt)
+    psi *= np.real(np.exp(-0.5j * (V + g*np.abs(psi)**2 - mu)  * dt))
     
     #Include the next two lines if you want to add a black soliton
     #psi[x>=0] = -abs(psi[x>=0])
